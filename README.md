@@ -1,43 +1,66 @@
 # dsh-third-effort
 
-DSH 插件（Host 半 + Client 半）：
+DeepSeek Harness（DSH）插件，为会话补充三个能力：
 
-1. 让第三方供应商（`llm-pi-ai` 手工路由）的模型在会话里显示**推理等级**，并且把所选等级带进请求。
-2. 会话输入框工具行、权限选择右边加一个**显示时间**滑动开关：打开时每条消息的时间戳常显（当天 `HH:mm`，非当天 `日期 HH:mm`）；关闭时恢复官方悬停显示。
-3. **自动追问**：一次会话的 turn 停止后（报错停止或 EOF 完整停止），自动注入一条追问「任务是否已全部完成」；如果模型回复已完成就到此为止，如果还没做完就让它继续推进直到完成为止；模型正在等用户决策时**不发送**。
-
-## 为什么需要它
-
-- 手工路由的模型条目通常只有 `- id: xxx`，没有 `reasoningEfforts` 声明。
-- pi-ai 适配器于是上报 `reasoning: undefined` → 模型目录里该模型没有推理元数据 → composer 的推理等级（Effort）行直接隐藏。
-- 没有 Effort 行就选不了等级，请求里自然也没有 `reasoningEffort`。
-
-## 它做什么
-
-启动后（等 `llm-pi-ai` 的 settings 命名空间就绪）：
-
-1. 读 `llm-pi-ai` 分节的 `providers`（只读已存储的用户层，不碰凭据）。
-2. 对配置覆盖的路由（默认全部非目录路由），逐模型用 `llm.resolveModelInfo` 查实时能力。
-3. 当前**没有**推理能力的模型 → 用 `settings.update`（merge，只补字段）给它的 `models` 条目写上 `reasoningEfforts`（默认 `off/low/medium/high/xhigh/max`）。
-4. 写入走适配器自带的 `assertServiceable` 校验，写不进去就大声报错、不静默。
-5. 之后官方链路自动接管：目录重拉 → Effort 行出现 → `selectModel → resolveCallConfig → prepareCall` 把等级带进请求。本插件不加任何请求路径。
-
-## 安全规则
-
-- 已声明 `reasoningEfforts`（哪怕是 `false`）的模型默认不动（`overwrite: false`）。
-- 只补 `models` 条目字段，不读不写 `apiKeyEnv` 与其它字段。
-- 只增不删：插件从不删除声明；`settings/document-updated` 触发时只处理新增的未覆盖模型。
-- 写入失败（网关方言不支持等）只记日志，不影响其它路由。
+1. **推理等级**：让第三方供应商（`llm-pi-ai` 手工路由）的模型显示「推理等级」，并把所选等级带进请求。
+2. **显示时间开关**：在会话输入框工具行、权限选择右边加一个滑动开关，控制每条消息的时间戳是否常显。
+3. **自动追问**：一次会话的 turn 停止后（报错停止或 EOF 完整停止），自动追问「任务是否已全部完成」；完成了就停，没完成就继续推进直到做完；模型正在等用户决策时**不发送**。
 
 ## 安装
 
+最新版（GitHub，推荐）：
+
 ```sh
-dsh plugin --profile web add G:\XSC\!Project\DSH_third_effort
+dsh plugin add github:xieshang/dsh_third_effort
 ```
 
-config-manager / approve-builds 的老坑：如果 add 失败，先在 profile 目录跑 `pnpm approve-builds --all` 后重试。
+钉住版本（更稳，适合生产）：
 
-Host 插件需要重启 `dsh web` 生效（client 插件才只需硬刷新）。
+```sh
+dsh plugin add github:xieshang/dsh_third_effort#v0.1.0
+```
+
+从 npm（发布后可选渠道）：
+
+```sh
+dsh plugin add dsh-third-effort
+```
+
+本地开发调试：
+
+```sh
+dsh plugin add /path/to/dsh_third_effort
+```
+
+> 安装完成后**重启 dsh 进程**使 Host 半生效；浏览器侧改动只需硬刷新页面。
+
+## 功能说明
+
+### 1. 推理等级（reasoningEfforts 自动回填）
+
+**为什么**：手工路由的模型条目通常只有 `- id: xxx`，没有 `reasoningEfforts` 声明 → pi-ai 适配器上报 `reasoning: undefined` → 推理等级行隐藏 → 请求里也没有 `reasoningEffort`。
+
+**做了什么**：启动后会等 `llm-pi-ai` 的 settings 命名空间就绪，然后：
+
+1. 读 `llm-pi-ai` 分节的 `providers`（只读用户层，不碰凭据）。
+2. 对配置覆盖的路由，逐模型用实时能力查询。
+3. 给**没有**推理能力的模型写入 `reasoningEfforts`（默认 `off/low/medium/high/xhigh/max`）。
+4. 写入走适配器自身的校验，写不进就大声报错、不静默。
+5. 之后官方链路自动接管：目录重拉 → 「推理等级」行出现 → `selectModel → resolveCallConfig → prepareCall` 把等级带进请求。本插件不加任何请求路径。
+
+### 2. 显示时间开关
+
+- 位置：会话输入框工具行、权限选择右边（滑动开关，默认开）。
+- 打开：每条消息的时间常显（当天 `HH:mm`，今年内 `M月d日 HH:mm`，跨年 `年月日 HH:mm`）。
+- 关闭：恢复官方「悬停才显示」。
+- 选择记在浏览器 localStorage，换浏览器/清缓存后恢复默认（开）。
+
+### 3. 自动追问
+
+- 触发：turn 以 `completed`（EOF 完整停止）或 `error`（报错停止）结束时。
+- 不打扰：模型已回复完成任务、或正在等你做决策（`aborted`/`blocked` 也不算）时不发。
+- 防刷屏：同一段人工输入后连续自动追问最多 `verifyMaxRounds` 轮（默认 3）。
+- 只作用于顶层会话，不打扰被委派的子代理。
 
 ## 配置（cordis.patch.yml 行内 config）
 
@@ -48,29 +71,43 @@ Host 插件需要重启 `dsh web` 生效（client 插件才只需硬刷新）。
 | `overwrite` | `false` | 是否覆盖已有声明（默认只补缺） |
 | `rescanMs` | `60000` | 运行中重扫间隔；`0` = 只在启动跑一次 |
 | `autoVerify` | `true` | 是否启用自动追问 |
-| `verifyPrompt` | 内置默认 | 注入的追问文案（可选覆盖） |
-| `verifyMaxRounds` | `3` | 每次人工输入后连续自动追问的最大轮数（防止坏循环无限刷屏） |
+| `verifyPrompt` | 内置默认 | 注入的追问文案（可选覆盖，见下） |
+| `verifyMaxRounds` | `3` | 每次人工输入后连续自动追问的最大轮数 |
 | `enabled` | — | 设 `false` 停用 |
+
+自定义追问文案示例：
+
+```yaml
+- insert:
+    - id: third-effort
+      config:
+        autoVerify: true
+        verifyPrompt: |
+          请汇报当前任务进度：如已全部完成请直接回复“任务已完成”；
+          如有未完成项请继续推进，全部做完后再回复“任务已完成”。
+```
 
 ## 验证
 
-### 推理等级
+- **推理等级**：模型菜单出现「推理等级」行 → 选 High → 发出的请求带 `reasoning_effort: high`。
+- **显示时间**：开关打开后消息时间常显；关闭后恢复悬停显示。
+- **自动追问**：给模型一个多步任务，等它结束或报错停下，日志出现 `third-effort: auto-verify follow-up queued`，模型自动补一轮确认/收尾；回复「任务已完成」后不再追问。
 
-1. 重启 `dsh web`，看日志有 `third-effort: declared reasoningEfforts for N model(s) on route "xxx"`。
-2. 会话 composer 点模型 → 出现「推理等级」行 → 选 High。
-3. 发一句话，看网关/上游收到的请求带 `reasoning_effort: high`（opencode2api 类网关：下游自带字段优先透传，`hasDownstreamReasoning` 为真即不再套默认值）。
+## 卸载
 
-### 显示时间开关
+```sh
+dsh plugin remove dsh-third-effort
+```
 
-1. 重启 `dsh web` 后**硬刷新浏览器**（client 半只改了浏览器侧）。
-2. 会话输入框工具行、权限选择右边出现「显示时间」滑动开关（默认开）。
-3. 打开：每条消息的时间常显（当天 `HH:mm`，今年内 `M月d日 HH:mm`，跨年 `年月日 HH:mm`）；关闭：恢复官方悬停才显示。
-4. 选择记在浏览器 localStorage，换浏览器/清缓存后恢复默认（开）。
+并删除 `cordis.patch.yml` 里对应的 `third-effort` 行（或按 DSH 的卸载流程自动回滚补丁）。
 
-### 自动追问
+重启 dsh 生效。
 
-1. 重启 `dsh web`（Host 半改动生效）。
-2. 给模型一个多步任务，等它正常结束（EOF）或中途报错停下。
-3. 日志出现 `third-effort: auto-verify follow-up queued`，模型会自动再发一轮确认/收尾。
-4. 模型回复「任务已完成」后不再追问；模型反问等你选择时也不追问；用户手动停止（aborted）也不追问。
-5. 同一段人工对话内连续自动追问最多 `verifyMaxRounds`（默认 3）轮。
+## 仓库
+
+- GitHub：<https://github.com/xieshang/dsh_third_effort>
+- npm（发布后）：`dsh-third-effort`
+
+## License
+
+MIT
