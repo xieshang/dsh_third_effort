@@ -1,0 +1,39 @@
+# dsh-third-effort bundle patch: inserts the host plugin row into the
+# profile roster. Installed with:
+#   dsh plugin --profile web add <path-to-DSH_third_effort>
+# (the CLI forwards to pnpm inside the profile directory and, seeing the
+# `dsh.bundle.patch` manifest field, appends this package to
+# `dsh.profile.bundles`; the boot then merges THIS patch).
+#
+# Row id must match the Host plugin's `export const name` in lib/index.js.
+- insert:
+    - id: third-effort
+      name: 'dsh-third-effort'
+      config:
+        # Which pi-ai provider routes to cover ("*" = every non-catalog route).
+        providers:
+          - '*'
+        # Levels offered in the composer 推理等级 menu (key = menu id,
+        # value = wire spelling sent by the pi-ai adapter). `off` stays empty
+        # (supported, send nothing). Only levels the endpoint understands
+        # should be listed here.
+        efforts:
+          off: null
+          low: low
+          medium: medium
+          high: high
+          xhigh: xhigh
+          max: max
+        # Never touch a model that already declares reasoningEfforts/false.
+        overwrite: false
+        # Re-check every N ms for routes added while running (0 = once at boot).
+        rescanMs: 60000
+        # Auto-verify: after a turn closes (EOF-complete or error), inject a
+        # follow-up asking whether the task is done; stop when the closing
+        # assistant message already says done, is awaiting a user decision,
+        # or the consecutive auto-round cap is reached.
+        autoVerify: true
+        # Custom follow-up prompt (optional; default asks to finish or confirm).
+        # verifyPrompt: '...'
+        # Max consecutive automatic follow-up rounds per human turn.
+        verifyMaxRounds: 3

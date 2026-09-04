@@ -1,0 +1,51 @@
+{
+  "name": "dsh-third-effort",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness (DSH) plugin: shows 推理等级 (reasoning effort) for third-party llm-pi-ai models and carries it into requests; adds a show-message-time toggle to the composer; auto-verifies task completion after each stopped turn.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "reasoning",
+    "reasoning-effort",
+    "llm-pi-ai",
+    "chat"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6"
+  }
+}
