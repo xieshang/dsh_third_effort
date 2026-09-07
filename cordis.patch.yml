@@ -37,3 +37,20 @@
         # verifyPrompt: '...'
         # Max consecutive automatic follow-up rounds per human turn.
         verifyMaxRounds: 3
+        # ── 请求头 (agent fingerprint) ─────────────────────────────────────
+        # A dropdown next to the composer model selector writes a chosen preset
+        # into llm-pi-ai `providers.<route>.headers`. `user-agent` (app
+        # attribution) and `authorization` (apiKeyEnv) are reserved by the
+        # adapter and cannot be overridden — presets must key on other fields.
+        headerEnabled: true
+        # Preset applied at boot to covered routes with no headers yet; `none`
+        # = manage nothing until chosen from the composer. `none` is not a
+        # real preset (it unsets the field).
+        defaultHeaderPreset: none
+        # Presets merge over the built-in claude/codex/opencode defaults
+        # (same id = replace, new id = add). Every value must be a string.
+        # headerPresets:
+        #   claude:
+        #     x-app: claude-code
+        #     anthropic-version: '2023-06-01'
+        #     anthropic-dangerous-direct-browser-access: 'true'

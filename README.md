@@ -1,10 +1,11 @@
 # dsh-third-effort
 
-DeepSeek Harness（DSH）插件，为会话补充三个能力：
+DeepSeek Harness（DSH）插件，为会话补充四个能力：
 
 1. **推理等级**：让第三方供应商（`llm-pi-ai` 手工路由）的模型显示「推理等级」，并把所选等级带进请求。
 2. **显示时间开关**：在会话输入框工具行、权限选择右边加一个滑动开关，控制每条消息的时间戳是否常显。
 3. **自动追问**：一次会话的 turn 停止后（报错停止或 EOF 完整停止），自动追问「任务是否已全部完成」；完成了就停，没完成就继续推进直到做完；模型正在等用户决策时**不发送**。
+4. **请求头选择**：在模型选择按钮旁加一个「请求头」下拉，把所选预设写进该网关路由的 `providers.<route>.headers`，让发出的请求带上模拟 agent（Claude / Codex / OpenCode 等）的指纹头。
 
 ## 安装
 
@@ -62,6 +63,15 @@ dsh plugin add /path/to/dsh_third_effort
 - 防刷屏：同一段人工输入后连续自动追问最多 `verifyMaxRounds` 轮（默认 3）。
 - 只作用于顶层会话，不打扰被委派的子代理。
 
+### 4. 请求头选择（模拟 agent 指纹）
+
+- 位置：输入框工具行、**模型选择按钮左边**的「请求头」下拉。
+- 下拉会随当前模型自动定位到它所属的网关路由（每次会话生效层是**整个路由**，不是单个模型）。
+- 选中一个预设后，插件把该预设的 headers 写入 `llm-pi-ai` 分节 `providers.<route>.headers`，之后该网关发出的每个请求都带这套指纹头 → 网关可据此路由到不同的下游 agent 池。
+- 内置预设：`claude`（`x-app: claude-code` + `anthropic-version`）、`codex`（`x-app: codex`）、`opencode`（`x-app`/`x-app-id: opencode`）、`无`（清空该路由 header）。
+- **不能伪装的字段**：适配器保留 `user-agent`（强制带 DSH 应用归属）与 `authorization`（来自 apiKeyEnv），预设里写这两个会被过滤/覆盖——网关路由请按 `x-app`、`anthropic-version` 等项目区分。
+- 可在 `config.headerPresets` 里整体替换或新增预设（见配置表）。
+
 ## 配置（cordis.patch.yml 行内 config）
 
 | key | 默认 | 说明 |
@@ -73,6 +83,9 @@ dsh plugin add /path/to/dsh_third_effort
 | `autoVerify` | `true` | 是否启用自动追问 |
 | `verifyPrompt` | 内置默认 | 注入的追问文案（可选覆盖，见下） |
 | `verifyMaxRounds` | `3` | 每次人工输入后连续自动追问的最大轮数 |
+| `headerEnabled` | `true` | 是否启用请求头预设下拉与写入 |
+| `defaultHeaderPreset` | `none` | 启动时给「尚无 headers」的覆盖路由套用的预设；`none` = 不管 |
+| `headerPresets` | 内置 | 预设 id → headers；同 id 覆盖、新 id 追加（值必须都是字符串） |
 | `enabled` | — | 设 `false` 停用 |
 
 自定义追问文案示例：
@@ -92,6 +105,7 @@ dsh plugin add /path/to/dsh_third_effort
 - **推理等级**：模型菜单出现「推理等级」行 → 选 High → 发出的请求带 `reasoning_effort: high`。
 - **显示时间**：开关打开后消息时间常显；关闭后恢复悬停显示。
 - **自动追问**：给模型一个多步任务，等它结束或报错停下，日志出现 `third-effort: auto-verify follow-up queued`，模型自动补一轮确认/收尾；回复「任务已完成」后不再追问。
+- **请求头**：模型选择旁出现「请求头」下拉 → 选 Claude → `llm-pi-ai` 分节该路由出现 `headers: {x-app: claude-code, ...}`，网关日志可见新指纹。
 
 ## 卸载
 
